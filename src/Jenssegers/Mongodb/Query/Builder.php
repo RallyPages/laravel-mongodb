@@ -105,7 +105,21 @@ class Builder extends BaseBuilder
         $this->grammar = new Grammar();
         $this->connection = $connection;
         $this->processor = $processor;
-        $this->useCollections = version_compare(\Illuminate\Foundation\Application::VERSION, '5.3', '>=');
+        $this->useCollections = $this->shouldUseCollections();
+    }
+    
+    /**
+     * Returns true if Laravel or Lumen >= 5.3
+     *
+     * @return bool
+     */
+    protected function shouldUseCollections()
+    {
+        if (function_exists('app')) {
+            $version = app()->version();
+            $version = filter_var(explode(')', $version)[0], FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION); // lumen
+            return version_compare($version, '5.3', '>=');
+        }
     }
 
     /**
@@ -202,6 +216,7 @@ class Builder extends BaseBuilder
         // Use MongoDB's aggregation framework when using grouping or aggregation functions.
         if ($this->groups or $this->aggregate or $this->paginating) {
             $group = [];
+            $unwinds = [];
 
             // Add grouping columns to the $group part of the aggregation pipeline.
             if ($this->groups) {
@@ -227,6 +242,13 @@ class Builder extends BaseBuilder
                 $function = $this->aggregate['function'];
 
                 foreach ($this->aggregate['columns'] as $column) {
+                    // Add unwind if a subdocument array should be aggregated
+                    // column: subarray.price => {$unwind: '$subarray'}
+                    if (count($splitColumns = explode('.*.', $column)) == 2) {
+                        $unwinds[] = $splitColumns[0];
+                        $column = implode('.', $splitColumns);
+                    }
+
                     // Translate count into sum.
                     if ($function == 'count') {
                         $group['aggregate'] = ['$sum' => 1];
@@ -256,6 +278,12 @@ class Builder extends BaseBuilder
             if ($wheres) {
                 $pipeline[] = ['$match' => $wheres];
             }
+
+            // apply unwinds for subdocument array aggregation
+            foreach ($unwinds as $unwind) {
+                $pipeline[] = ['$unwind' => '$' . $unwind];
+            }
+
             if ($group) {
                 $pipeline[] = ['$group' => $group];
             }
@@ -914,8 +942,18 @@ class Builder extends BaseBuilder
             }
 
             // Convert DateTime values to UTCDateTime.
-            if (isset($where['value']) and $where['value'] instanceof DateTime) {
-                $where['value'] = new UTCDateTime($where['value']->getTimestamp() * 1000);
+            if (isset($where['value'])) {
+                if (is_array($where['value'])) {
+                    array_walk_recursive($where['value'], function (&$item, $key) {
+                        if ($item instanceof DateTime) {
+                            $item = new UTCDateTime($item->getTimestamp() * 1000);
+                        }
+                    });
+                } else {
+                    if ($where['value'] instanceof DateTime) {
+                        $where['value'] = new UTCDateTime($where['value']->getTimestamp() * 1000);
+                    }
+                }
             }
 
             // The next item in a "chain" of wheres devices the boolean of the

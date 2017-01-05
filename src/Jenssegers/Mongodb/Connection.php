@@ -1,6 +1,4 @@
-<?php
-
-namespace Jenssegers\Mongodb;
+<?php namespace Jenssegers\Mongodb;
 
 use MongoDB\Client;
 
@@ -23,7 +21,7 @@ class Connection extends \Illuminate\Database\Connection
     /**
      * Create a new database connection instance.
      *
-     * @param array $config
+     * @param  array   $config
      */
     public function __construct(array $config)
     {
@@ -42,6 +40,8 @@ class Connection extends \Illuminate\Database\Connection
         $this->db = $this->connection->selectDatabase($config['database']);
 
         $this->useDefaultPostProcessor();
+
+        $this->useDefaultSchemaGrammar();
     }
 
     /**
@@ -51,14 +51,13 @@ class Connection extends \Illuminate\Database\Connection
      */
     protected function getDefaultPostProcessor()
     {
-        return new Query\Processor();
+        return new Query\Processor;
     }
 
     /**
      * Begin a fluent query against a database collection.
      *
-     * @param string $collection
-     *
+     * @param  string  $collection
      * @return Query\Builder
      */
     public function collection($collection)
@@ -73,8 +72,7 @@ class Connection extends \Illuminate\Database\Connection
     /**
      * Begin a fluent query against a database collection.
      *
-     * @param string $table
-     *
+     * @param  string  $table
      * @return Query\Builder
      */
     public function table($table)
@@ -85,8 +83,7 @@ class Connection extends \Illuminate\Database\Connection
     /**
      * Get a MongoDB collection.
      *
-     * @param string $name
-     *
+     * @param  string   $name
      * @return Collection
      */
     public function getCollection($name)
@@ -127,11 +124,10 @@ class Connection extends \Illuminate\Database\Connection
     /**
      * Create a new MongoDB connection.
      *
-     * @param string $dsn
-     * @param array  $config
-     * @param array  $options
-     *
-     * @return MongoDB
+     * @param  string  $dsn
+     * @param  array   $config
+     * @param  array   $options
+     * @return \MongoDB\Client
      */
     protected function createConnection($dsn, array $config, array $options)
     {
@@ -164,40 +160,36 @@ class Connection extends \Illuminate\Database\Connection
     /**
      * Create a DSN string from a configuration.
      *
-     * @param array $config
-     *
+     * @param  array   $config
      * @return string
      */
     protected function getDsn(array $config)
     {
-        // First we will create the basic DSN setup as well as the port if it is in
-        // in the configuration options. This will give us the basic DSN we will
-        // need to establish the MongoDB and return them back for use.
-        extract($config);
-
         // Check if the user passed a complete dsn to the configuration.
-        if (!empty($dsn)) {
-            return $dsn;
+        if (! empty($config['dsn'])) {
+            return $config['dsn'];
         }
 
         // Treat host option as array of hosts
-        $hosts = is_array($host) ? $host : [$host];
+        $hosts = is_array($config['host']) ? $config['host'] : [$config['host']];
 
         foreach ($hosts as &$host) {
             // Check if we need to add a port to the host
-            if (strpos($host, ':') === false and isset($port)) {
-                $host = "{$host}:{$port}";
+            if (strpos($host, ':') === false && ! empty($config['port'])) {
+                $host = $host . ':' . $config['port'];
             }
         }
 
-        return 'mongodb://'.implode(',', $hosts)."/{$database}";
+        // Check if we want to authenticate against a specific database.
+        $auth_database = isset($config['options']) && ! empty($config['options']['database']) ? $config['options']['database'] : null;
+
+        return 'mongodb://' . implode(',', $hosts) . ($auth_database ? '/' . $auth_database : '');
     }
 
     /**
      * Get the elapsed time since a given starting point.
      *
-     * @param int $start
-     *
+     * @param  int    $start
      * @return float
      */
     public function getElapsedTime($start)
@@ -216,11 +208,20 @@ class Connection extends \Illuminate\Database\Connection
     }
 
     /**
+     * Get the default schema grammar instance.
+     *
+     * @return Schema\Grammar
+     */
+    protected function getDefaultSchemaGrammar()
+    {
+        return new Schema\Grammar;
+    }
+
+    /**
      * Dynamically pass methods to the connection.
      *
-     * @param string $method
-     * @param array  $parameters
-     *
+     * @param  string  $method
+     * @param  array   $parameters
      * @return mixed
      */
     public function __call($method, $parameters)

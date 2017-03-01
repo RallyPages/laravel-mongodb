@@ -39,7 +39,8 @@ composer require jenssegers/mongodb
  5.0.x    | 2.1.x
  5.1.x    | 2.2.x or 3.0.x
  5.2.x    | 2.3.x or 3.0.x
- 5.3.x    | 3.1.x
+ 5.3.x    | 3.1.x or 3.2.x
+ 5.4.x    | 3.2.x
 
 And add the service provider in `config/app.php`:
 
@@ -50,7 +51,7 @@ Jenssegers\Mongodb\MongodbServiceProvider::class,
 For usage with [Lumen](http://lumen.laravel.com), add the service provider in `bootstrap/app.php`. In this file, you will also need to enable Eloquent. You must however ensure that your call to `$app->withEloquent();` is **below** where you have registered the `MongodbServiceProvider`:
 
 ```php
-$app->register('Jenssegers\Mongodb\MongodbServiceProvider');
+$app->register(Jenssegers\Mongodb\MongodbServiceProvider::class);
 
 $app->withEloquent();
 ```
@@ -120,7 +121,7 @@ And add a new mongodb connection:
     'database' => env('DB_DATABASE'),
     'username' => env('DB_USERNAME'),
     'password' => env('DB_PASSWORD'),
-    'options' => [
+    'options'  => [
         'database' => 'admin' // sets the authentication database required by mongo 3
     ]
 ],
@@ -136,7 +137,9 @@ You can connect to multiple servers or replica sets with the following configura
     'database' => env('DB_DATABASE'),
     'username' => env('DB_USERNAME'),
     'password' => env('DB_PASSWORD'),
-    'options'  => ['replicaSet' => 'replicaSetName']
+    'options'  => [
+		'replicaSet' => 'replicaSetName'
+	]
 ],
 ```
 
@@ -182,7 +185,7 @@ Everything else (should) work just like the original Eloquent model. Read more a
 You may also register an alias for the MongoDB model by adding the following to the alias array in `config/app.php`:
 
 ```php
-'Moloquent'       => 'Jenssegers\Mongodb\Eloquent\Model',
+'Moloquent'       => Jenssegers\Mongodb\Eloquent\Model::class,
 ```
 
 This will allow you to use the registered alias like:
